@@ -3,19 +3,22 @@ from bs4 import BeautifulSoup
 import csv
 import re
 
-URL = 'https://www.lotteryextreme.com/canada/lottomax-results'
+# URL = 'https://www.lotteryextreme.com/canada/lottomax-results'
+HTML_FILE = 'lottomax_results.html'
 CSV_FILE = 'lotto_max_history.csv'
 
 def fetch_lotto_data():
-    response = requests.get(URL)
-    soup = BeautifulSoup(response.text, 'html.parser')
+    with open(HTML_FILE, 'r', encoding='utf-8') as f:
+        html = f.read()
+    soup = BeautifulSoup(html, 'html.parser')
     results = []
-    for cx in soup.select('td.cx'):
+    cxs = soup.find_all('td', class_='cx')
+    print(f"Found {len(cxs)} td.cx tags")
+    for i, cx in enumerate(cxs):
         m = re.search(r'\((\d{4}-\d{2}-\d{2})', cx.text)
         if not m:
             continue
         date = m.group(1)
-        # پیدا کردن ul.displayball بعدی در ساختار جدول
         tr = cx.find_parent('tr')
         next_tr = tr.find_next_sibling('tr')
         if not next_tr:
@@ -23,9 +26,17 @@ def fetch_lotto_data():
         ul = next_tr.find('ul', class_='displayball')
         if not ul:
             continue
-        nums = [li.text.strip() for li in ul.find_all('li') if li.text.strip().isdigit()]
-        if len(nums) >= 7:
-            results.append([date] + nums[:7])
+        nums = []
+        for li in ul.find_all('li'):
+            print(f"li: '{li}' text: '{li.text}' class: {li.get('class', [])}")
+            if 'dbx' in li.get('class', []):
+                break
+            match = re.search(r'\d+', li.text)
+            if match:
+                nums.append(match.group())
+        print(f"{date}: {nums}")
+        if len(nums) == 7:
+            results.append([date] + nums)
     return results
 
 def save_to_csv(data):
